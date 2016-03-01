@@ -23,16 +23,33 @@ function DataLoader:__init(kwargs)
   self.y_splits = {}
   self.split_sizes = {}
   for split, v in pairs(splits) do
-    local num = v:nElement()
-    local extra = num % (N * T)
 
-    -- Chop out the extra bits at the end to make it evenly divide
-    local vx = v[{{1, num - extra}}]:view(-1, N, T):contiguous()
-    local vy = v[{{2, num - extra + 1}}]:view(-1, N, T):contiguous()
+     local len = v:nElement()
+     local n_pairs = len / (self.seq_length * 2 + 1)
+     local n_batches = math.floor(n_pairs / self.batch_size)
 
-    self.x_splits[split] = vx
-    self.y_splits[split] = vy
-    self.split_sizes[split] = vx:size(1)
+     -- prepare containers
+     local vx = torch.ByteTensor(self.batch_size * n_batches * self.seq_length)
+     local vy = torch.ByteTensor(self.batch_size * n_batches * self.seq_length)
+
+     -- read/write pointers
+     local r_pos = 1
+     local w_pos = 1
+
+     for tune = 1, n_batches * self.batch_size do
+	vx:sub(w_pos,
+	       w_pos + self.seq_length - 1):copy(v:sub(r_pos,
+						       r_pos + self.seq_length - 1))
+	vy:sub(w_pos,
+	       w_pos + self.seq_length - 1):copy(v:sub(r_pos + self.seq_length + 1,
+						       r_pos + 2 * self.seq_length))
+	r_pos = r_pos + 2 * self.seq_length + 1
+	w_pos = w_pos + self.seq_length
+     end
+
+     self.x_splits[split] = vx:view(-1, N, T):contiguous()
+     self.y_splits[split] = vy:view(-1, N, T):contiguous()
+     self.split_sizes[split] = n_batches
   end
 
   self.split_idxs = {train=1, val=1, test=1}
