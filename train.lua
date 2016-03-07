@@ -186,11 +186,14 @@ for i = 1, num_iterations do
     -- Evaluate loss on the validation set. Note that we reset the state of
     -- the model; this might happen in the middle of an epoch, but that
     -- shouldn't cause too much trouble.
+    print('Evaluating...')
     model:evaluate()
     model:resetStates()
+    print('Load val splits')
     local num_val = loader.split_sizes['val']
     local val_loss = 0
     for j = 1, num_val do
+      print(j, '/', num_val)
       local xv, yv = loader:nextBatch('val')
       xv = xv:type(dtype)
       yv = yv:type(dtype):view(N * T)
